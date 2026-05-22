@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+
+ <head>
+ <meta charset="UTF-8">
+ <title>ATTABOY SPACE SHOOTER</title>
+    <style>
+      body { text-align: center; background: #000; margin: 0; padding: 0; height: 100vh; overflow: hidden; }
+      h1 { color: white; margin: 4px 0; font-size: 1.2em; }
+      canvas { display: block; width: 100%; max-width: 1200px; margin: 0 auto;
+               background: linear-gradient(black, red, purple, darkblue, black); }
+      #controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 400px;
+        margin: 8px auto 0;
+        padding: 0 20px;
+      }
+      #dpad {
+        display: grid;
+        grid-template-areas: ". up ." "left . right" ". down .";
+        grid-template-columns: 60px 60px 60px;
+        grid-template-rows: 60px 60px 60px;
+        gap: 3px;
+      }
+      #dpad button { font-size: 1.4em; background: #333; color: white;
+                     border: 2px solid #666; border-radius: 10px;
+                     width: 60px; height: 60px; padding: 0; }
+      #btnUp    { grid-area: up; }
+      #btnLeft  { grid-area: left; }
+      #btnRight { grid-area: right; }
+      #btnDown  { grid-area: down; }
+      #btnFire  { font-size: 1.4em; width: 90px; height: 90px; padding: 0;
+                  background: #600; color: white; border: 3px solid #f44;
+                  border-radius: 50%; }
+    </style>
+ </head>
+
+ <body>
+    <h1>Attaboy Space Shooter</h1>
+
+    <canvas id="game"></canvas>
+
+    <div id="controls">
+      <div id="dpad">
+        <button id="btnUp">&#9650;</button>
+        <button id="btnLeft">&#9664;</button>
+        <button id="btnRight">&#9654;</button>
+        <button id="btnDown">&#9660;</button>
+      </div>
+      <button id="btnFire">FIRE</button>
+    </div>
+
+  <script>
+  var game = document.getElementById("game");
+  var ctx  = game.getContext("2d");
+
+  /* Stars — each has a speed so they scroll */
+  var stars = [];
+
+  var shipX, shipY;
+  var shipW = 60;
+  var shipH = 60;
+
+  function resizeCanvas() {
+    game.width = Math.min(window.innerWidth, 1200);
+    if (window.innerHeight > window.innerWidth) {
+      game.height = window.innerHeight - 220;
+    } else {
+      game.height = Math.round(game.width * 5 / 12);
+    }
+    game.height = Math.max(game.height, 200);
+    shipX = game.width  / 2 - shipW / 2;
+    shipY = game.height / 2 - shipH / 2;
+    stars = [];
+    var i = 0;
+    while (i < 60) {
+      stars.push({
+        x:     Math.random() * game.width,
+        y:     Math.random() * game.height,
+        size:  Math.random() * 2 + 0.5,
+        speed: Math.random() * 1.5 + 0.5
+      });
+      i = i + 1;
+    }
+  }
+
+  resizeCanvas();
+  window.onresize = resizeCanvas;
+
+  /* Alien */
+  var alien = {
+    x: 100, y: -60, w: 60, h: 60, speed: 2
+  };
+
+  /* Bullets + explosions */
+  var bullets    = [];
+  var cooldown   = 0;
+  var explosions = [];
+
+  /* Score + lives */
+  var score  = 0;
+  var lives  = 3;
+  var gameOver = false;
+
+  /* Keys */
+  var goLeft  = false;
+  var goRight = false;
+  var goUp    = false;
+  var goDown  = false;
+  var goFire  = false;
+
+  document.onkeydown = function(e) {
+    if (e.key === "ArrowLeft")  goLeft  = true;
+    if (e.key === "ArrowRight") goRight = true;
+    if (e.key === "ArrowUp")    goUp    = true;
+    if (e.key === "ArrowDown")  goDown  = true;
+    if (e.key === " ")          goFire  = true;
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+  }
+  document.onkeyup = function(e) {
+    if (e.key === "ArrowLeft")  goLeft  = false;
+    if (e.key === "ArrowRight") goRight = false;
+    if (e.key === "ArrowUp")    goUp    = false;
+    if (e.key === "ArrowDown")  goDown  = false;
+    if (e.key === " ")          goFire  = false;
+  }
+
+  /* Touch buttons */
+  var leftFlag  = { on: false };
+  var rightFlag = { on: false };
+  var upFlag    = { on: false };
+  var downFlag  = { on: false };
+  var fireFlag  = { on: false };
+
+  function wire(id, flag) {
+    var el = document.getElementById(id);
+    ["touchstart","mousedown"].forEach(function(ev) {
+      el.addEventListener(ev, function(e){ e.preventDefault(); flag.on = true; });
+    });
+    ["touchend","mouseup","touchcancel"].forEach(function(ev) {
+      el.addEventListener(ev, function(){ flag.on = false; });
+    });
+  }
+  wire("btnLeft",  leftFlag);
+  wire("btnRight", rightFlag);
+  wire("btnUp",    upFlag);
+  wire("btnDown",  downFlag);
+  wire("btnFire",  fireFlag);
+
+  function draw() {
+    if (gameOver) {
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, game.width, game.height);
+      ctx.fillStyle = "white";
+      ctx.font = "bold 48px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("GAME OVER", game.width / 2, game.height / 2 - 40);
+      ctx.font = "32px sans-serif";
+      ctx.fillText("Score: " + score, game.width / 2, game.height / 2 + 20);
+      ctx.font = "24px sans-serif";
+      ctx.fillText("Reload to play again!", game.width / 2, game.height / 2 + 70);
+      return;
+    }
+    ctx.clearRect(0, 0, game.width, game.height);
+
+    /* Scroll stars */
+    ctx.fillStyle = "white";
+    var i = 0;
+    while (i < stars.length) {
+      var s = stars[i];
+      s.y = s.y + s.speed;
+      if (s.y > game.height) { s.y = 0; s.x = Math.random() * game.width; }
+      ctx.globalAlpha = 0.6 + s.size * 0.2;
+      ctx.fillRect(s.x, s.y, s.size, s.size);
+      i = i + 1;
+    }
+    ctx.globalAlpha = 1;
+
+    /* Move alien */
+    alien.y = alien.y + alien.speed;
+    if (alien.y > game.height) {
+      alien.x = Math.random() * (game.width - alien.w);
+      alien.y = -alien.h;
+    }
+
+    /* Draw alien */
+    ctx.font = "50px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("👾", alien.x + alien.w / 2, alien.y + alien.h / 2);
+
+    /* Move ship */
+    var speed = 5;
+    if (goLeft  || leftFlag.on)  shipX = shipX - speed;
+    if (goRight || rightFlag.on) shipX = shipX + speed;
+    if (goUp    || upFlag.on)    shipY = shipY - speed;
+    if (goDown  || downFlag.on)  shipY = shipY + speed;
+
+    /* Keep ship inside canvas */
+    if (shipX < 0) shipX = 0;
+    if (shipX > game.width  - shipW) shipX = game.width  - shipW;
+    if (shipY < 0) shipY = 0;
+    if (shipY > game.height - shipH) shipY = game.height - shipH;
+
+    /* Fire */
+    if ((goFire || fireFlag.on) && cooldown === 0) {
+      bullets.push({ x: shipX + shipW / 2 - 2, y: shipY });
+      cooldown = 10;
+    }
+    if (cooldown > 0) cooldown = cooldown - 1;
+
+    /* Move and draw bullets */
+    var j = 0;
+    while (j < bullets.length) {
+      bullets[j].y = bullets[j].y - 10;
+      ctx.fillStyle = "yellow";
+      ctx.fillRect(bullets[j].x, bullets[j].y, 4, 12);
+      j = j + 1;
+    }
+    bullets = bullets.filter(function(b) {
+      var hit = b.x + 4 > alien.x &&
+                b.x < alien.x + alien.w &&
+                b.y < alien.y + alien.h &&
+                b.y + 12 > alien.y;
+      if (hit) {
+        explosions.push({ x: alien.x + alien.w / 2, y: alien.y + alien.h / 2, life: 20, maxLife: 20 });
+        alien.x = Math.random() * (game.width - alien.w);
+        alien.y = -alien.h;
+        score = score + 1;
+      }
+      return b.y > 0 && !hit;
+    });
+
+    /* Draw ship */
+    ctx.font = "60px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🚀", shipX + shipW / 2, shipY + shipH / 2);
+
+    /* Ship-alien collision */
+    var tooClose = Math.abs((shipX + shipW / 2) - (alien.x + alien.w / 2)) < 45 &&
+                   Math.abs((shipY + shipH / 2) - (alien.y + alien.h / 2)) < 45;
+    if (tooClose) {
+      explosions.push({ x: shipX + shipW / 2, y: shipY + shipH / 2, life: 20, maxLife: 20 });
+      alien.x = Math.random() * (game.width - alien.w);
+      alien.y = -alien.h;
+      lives = lives - 1;
+      if (lives <= 0) gameOver = true;
+    }
+
+    /* Draw score + lives */
+    ctx.font = "bold 20px sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "white";
+    ctx.fillText("Score: " + score, 10, 10);
+    ctx.textAlign = "right";
+    var hearts = "";
+    var h = 0;
+    while (h < lives) { hearts = hearts + "❤️"; h = h + 1; }
+    ctx.fillText(hearts, game.width - 10, 10);
+
+    /* Draw explosions */
+    var e = 0;
+    while (e < explosions.length) {
+      var ex  = explosions[e];
+      var pct = ex.life / ex.maxLife;
+      ctx.globalAlpha = pct;
+      ctx.beginPath();
+      ctx.arc(ex.x, ex.y, (1 - pct) * 60 + 5, 0, Math.PI * 2);
+      ctx.fillStyle = pct > 0.5 ? "yellow" : "orange";
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ex.life = ex.life - 1;
+      e = e + 1;
+    }
+    explosions = explosions.filter(function(ex) { return ex.life > 0; });
+  }
+
+  setInterval(draw, 16);
+  </script>
+  </body>
+</html>
