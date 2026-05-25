@@ -1223,7 +1223,10 @@
   }
 
   // ---------- Wire up UI ----------
-  document.querySelector('.logo').addEventListener('touchstart', (e) => {
+  const _godZone = document.createElement('div');
+  _godZone.style.cssText = 'position:absolute;top:0;left:0;width:70px;height:70px;z-index:60;';
+  frame.appendChild(_godZone);
+  _godZone.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const now = Date.now();
     _godSeq = _godSeq.filter(t => now - t < 2000);
@@ -1238,12 +1241,12 @@
   document.getElementById('btn-menu').addEventListener('click',   () => { window.SFX && window.SFX.ui(); goTitle(); });
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'ArrowUp') {
+    if (e.code === 'KeyG') {
       const now = Date.now();
       _godSeq = _godSeq.filter(t => now - t < 2000);
       _godSeq.push(now);
       if (_godSeq.length >= 3) { _godSeq = []; toggleGodMode(); }
-    } else if (!['Space','Enter','KeyP','Escape'].includes(e.code)) {
+    } else if (!['Space','Enter','KeyP','Escape','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyA','KeyD'].includes(e.code)) {
       _godSeq = [];
     }
     if (state === State.TITLE && (e.code === 'Space' || e.code === 'Enter')) {
