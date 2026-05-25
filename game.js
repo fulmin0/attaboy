@@ -88,6 +88,8 @@
   let state = State.TITLE;
   let prevState = null;
 
+  if (localStorage.getItem('attaboy:gm') === '1') Knobs.godMode = true;
+
   const game = {
     score: 0,
     hiScore: parseInt(localStorage.getItem('attaboy:hi') || '0', 10),
@@ -699,6 +701,24 @@
     }
   }
 
+  let _godSeq = [];
+  function toggleGodMode() {
+    Knobs.godMode = !Knobs.godMode;
+    const label = Knobs.godMode ? 'GOD MODE' : 'NORMAL MODE';
+    const color = Knobs.godMode ? T.gold : T.dim;
+    if (Knobs.godMode) localStorage.setItem('attaboy:gm', '1');
+    else localStorage.removeItem('attaboy:gm');
+    const el = document.createElement('div');
+    el.className = 'attaboy-callout';
+    el.textContent = label;
+    el.style.left = '50%';
+    el.style.top = '50%';
+    el.style.zIndex = '45';
+    if (color) { el.style.color = color; el.style.textShadow = `0 0 8px ${color}, 0 0 24px ${hexToRgba(color, 0.6)}`; }
+    frame.appendChild(el);
+    setTimeout(() => el.remove(), 1100);
+  }
+
   function damagePlayer() {
     if (player.shield > 0) {
       player.shield = 0;
@@ -1203,6 +1223,14 @@
   }
 
   // ---------- Wire up UI ----------
+  document.querySelector('.logo').addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    _godSeq = _godSeq.filter(t => now - t < 2000);
+    _godSeq.push(now);
+    if (_godSeq.length >= 3) { _godSeq = []; toggleGodMode(); }
+  }, { passive: false });
+
   document.getElementById('btn-start').addEventListener('click', () => { window.SFX && window.SFX.ui(); startGame(); });
   document.getElementById('btn-resume').addEventListener('click', () => { window.SFX && window.SFX.ui(); resume(); });
   document.getElementById('btn-quit').addEventListener('click',   () => { window.SFX && window.SFX.ui(); goTitle(); });
@@ -1210,6 +1238,14 @@
   document.getElementById('btn-menu').addEventListener('click',   () => { window.SFX && window.SFX.ui(); goTitle(); });
 
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowUp') {
+      const now = Date.now();
+      _godSeq = _godSeq.filter(t => now - t < 2000);
+      _godSeq.push(now);
+      if (_godSeq.length >= 3) { _godSeq = []; toggleGodMode(); }
+    } else if (!['Space','Enter','KeyP','Escape'].includes(e.code)) {
+      _godSeq = [];
+    }
     if (state === State.TITLE && (e.code === 'Space' || e.code === 'Enter')) {
       startGame();
     } else if (state === State.GAMEOVER && (e.code === 'Space' || e.code === 'Enter')) {
