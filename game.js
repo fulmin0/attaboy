@@ -363,7 +363,7 @@
     particles.length = 0;
     powerups.length = 0;
     player.x = W / 2;
-    player.y = H - 130;
+    player.y = H - 200;
     player.cooldown = 0;
     player.invul = 0;
     player.shield = 0;
